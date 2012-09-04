@@ -54,11 +54,9 @@ class UdpThread(threading.Thread):
             try:
                 data, addr = recv_sock.recvfrom(512)
                 logging.debug('Connection from %r', addr)
-                header = dns.get_header(data)
                 logging.debug('Message length %d', len(data))
-                logging.debug('Header %r', header)
-                question = dns.parse_question(data[12:])
-                logging.debug('Question %r', question)
+                x = dns.parse(data)
+                logging.debug('Message = %r', x)
                 recv_sock.sendto(data, addr)
             except Exception as e:
                 logging.error('Got exception: %r', e)

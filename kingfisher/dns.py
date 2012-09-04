@@ -101,12 +101,24 @@ import logging
 
 
 def get_header(msg):
+    """
+    :param msg: The message.
+    :returns: A dictionary representing the header.
+    ID => msg_id
+    QR => is_response
+    Opcode => opcode
+    AA => is_authorative
+    TC => is_truncated
+    RD => recursion_desired
+    RA => recursion_available
+    Z => z
+    RCODE => rcode
+    QDCOUNT => question_count
+    ANCOUNT => answer_count
+    NSCOUNT => ns_count
+    ARCOUNT => additional_count
+    """
     p = struct.unpack('>HHHHHH', msg[:12])
-    msg_id = p[0]
-    question_count = p[2]
-    answer_count = p[3]
-    ns_count = p[4]
-    additional_count = p[5]
     return {
         'msg_id': p[0],
         'question_count': p[2],
@@ -128,10 +140,13 @@ def get_part(msg):
     # if length is 0, it is the end
     # otherwise read the part, report the part and length used
     length, = struct.unpack('>B', msg[0])
+    logging.debug('Part length = %d', length)
     if length == 0:
         return (1, None)
     assert length > 0
     part = msg[1:1 + length]
+    logging.debug('Part = %r', part)
+    # 1 byte used for the length
     return (length + 1, part)
 
 
@@ -143,12 +158,69 @@ def parse_question(msg):
             msg = msg[1:]
             break
         parts.append(part)
-        logging.debug('%d %r', offset, part)
         msg = msg[offset:]
     qtype, qclass = struct.unpack('>HH', msg[:4])
-    return {
-        'names': parts,
+    logging.debug('qtype = %d, qclass = %d', qtype, qclass)
+    return (msg[4:], {
+        'name': '.'.join(parts),
         'qtype': qtype,
         'qclass': qclass,
-        'msg': msg[4:],
+    })
+
+def parse_resource_record(msg):
+    parts = []
+    while True:
+        offset, part = get_part(msg)
+        if part is None:
+            msg = msg[1:]
+            break
+        parts.append(part)
+        msg = msg[offset:]
+    name = '.'.join(parts)
+    type, klass, ttl, rd_length = struct.unpack('>HHIH')
+    record_data = msg[:rd_length]
+    return (msg[rd_length:], {
+        'type': type,
+        'class': klass,
+        'ttl': ttl,
+        'record': record_data
+    })
+
+def parse(msg):
+    header = get_header(msg)
+    msg = msg[12:]
+    # Question
+    question_count = header['question_count']
+    questions = []
+    while question_count > 0:
+        msg, question = parse_question(msg)
+        questions.append(question)
+        question_count -= 1
+    # Answer
+    answer_count = header['answer_count']
+    answers = []
+    while answer_count > 0:
+        msg, record = parse_resource_record(msg)
+        answers.append(record)
+        answer_count -= 1
+    # Authority
+    ns_count = header['ns_count']
+    authorities = []
+    while ns_count > 0:
+        msg, record = parse_resource_record(msg)
+        authorities.append(record)
+        ns_count -= 1
+    # Additional
+    additional_count = header['additional_count']
+    additionals = []
+    while additional_count > 0:
+        msg, record = parse_resource_record(msg)
+        additionals.append(record)
+        additional_count -= 1
+    return {
+        'header': header,
+        'questions': questions,
+        'answers': answers,
+        'authorities': authorities,
+        'additionals': additionals
     }
