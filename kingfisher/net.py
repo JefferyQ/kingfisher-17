@@ -56,6 +56,7 @@ class UdpThread(threading.Thread):
                 logging.debug('Connection from %r', addr)
                 logging.debug('Message length %d', len(data))
                 request = dns.parse(data)
+                logging.debug('Raw = %r', data)
                 logging.debug('Message = %r', request)
                 response = {
                     'questions': [],

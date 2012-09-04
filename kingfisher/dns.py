@@ -1,108 +1,12 @@
 """
 RFC1035
-4.1.1. Header section format
-
-The header contains the following fields:
-
-                                    1  1  1  1  1  1
-      0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
-    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    |                      ID                       |
-    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    |QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
-    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    |                    QDCOUNT                    |
-    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    |                    ANCOUNT                    |
-    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    |                    NSCOUNT                    |
-    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    |                    ARCOUNT                    |
-    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-
-where:
-
-ID              A 16 bit identifier assigned by the program that
-                generates any kind of query.  This identifier is copied
-                the corresponding reply and can be used by the requester
-                to match up replies to outstanding queries.
-
-QR              A one bit field that specifies whether this message is a
-                query (0), or a response (1).
-
-OPCODE          A four bit field that specifies kind of query in this
-                message.  This value is set by the originator of a query
-                and copied into the response.  The values are:
-
-                0               a standard query (QUERY)
-
-                1               an inverse query (IQUERY)
-
-                2               a server status request (STATUS)
-
-                3-15            reserved for future use
-
-AA              Authoritative Answer - this bit is valid in responses,
-                and specifies that the responding name server is an
-                authority for the domain name in question section.
-
-                Note that the contents of the answer section may have
-                multiple owner names because of aliases.  The AA bit
-                corresponds to the name which matches the query name, or
-                the first owner name in the answer section.
-
-TC              TrunCation - specifies that this message was truncated
-                due to length greater than that permitted on the
-                transmission channel.
-
-RD              Recursion Desired - this bit may be set in a query and
-                is copied into the response.  If RD is set, it directs
-                the name server to pursue the query recursively.
-                Recursive query support is optional.
-
-RA              Recursion Available - this be is set or cleared in a
-                response, and denotes whether recursive query support is
-                available in the name server.
-
-Z               Reserved for future use.  Must be zero in all queries
-                and responses.
-
-RCODE           Response code - this 4 bit field is set as part of
-                responses.  The values have the following
-                interpretation:
-
-                0               No error condition
-
-                1               Format error - The name server was
-                                unable to interpret the query.
-
-                2               Server failure - The name server was
-                                unable to process this query due to a
-                                problem with the name server.
-
-                3               Name Error - Meaningful only for
-                                responses from an authoritative name
-                                server, this code signifies that the
-                                domain name referenced in the query does
-                                not exist.
-
-                4               Not Implemented - The name server does
-                                not support the requested kind of query.
-
-                5               Refused - The name server refuses to
-                                perform the specified operation for
-                                policy reasons.  For example, a name
-                                server may not wish to provide the
-                                information to the particular requester,
-                                or a name server may not wish to perform
-                                a particular operation (e.g., zone
 """
 import struct
 import logging
 
 
 def get_header(msg):
-    """
+    r"""
     :param msg: The message.
     :returns: A dictionary representing the header.
     ID => msg_id
@@ -116,15 +20,51 @@ def get_header(msg):
     RCODE => rcode
     QDCOUNT => question_count
     ANCOUNT => answer_count
-    NSCOUNT => ns_count
+    NSCOUNT => authority_count
     ARCOUNT => additional_count
+
+    >>> get_header('\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')['msg_id']
+    1
+    >>> get_header('\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00')['question_count']
+    1
+    >>> get_header('\x00\x01\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00')['answer_count']
+    1
+    >>> get_header('\x00\x01\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00')['authority_count']
+    1
+    >>> get_header('\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01')['additional_count']
+    1
+    >>> get_header('\xFF\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')['msg_id']
+    65280
+    >>> get_header('\x00\x00\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00')['is_response']
+    1
+    >>> get_header('\x00\x00\x08\x00\x00\x00\x00\x00\x00\x00\x00\x00')['opcode']
+    1
+    >>> get_header('\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00')['is_authorative']
+    1
+    >>> get_header('\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00')['is_truncated']
+    1
+    >>> get_header('\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00')['recursion_desired']
+    1
+    >>> get_header('\x00\x00\x00\x80\x00\x00\x00\x00\x00\x00\x00\x00')['recursion_available']
+    1
+    >>> get_header('\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00')['rcode']
+    1
+    >>> x = get_header('\x78\x8c\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00')
+    >>> x['msg_id']
+    30860
+    >>> x['question_count']
+    1
+    >>> x['recursion_desired']
+    1
+    >>> x['is_response']
+    0
     """
     p = struct.unpack('>HHHHHH', msg[:12])
     return {
         'msg_id': p[0],
         'question_count': p[2],
         'answer_count': p[3],
-        'ns_count': p[4],
+        'authority_count': p[4],
         'additional_count': p[5],
         'is_response':         (p[1] >> 15) % 2,
         'opcode':              (p[1] >> 11) % 16,
@@ -203,12 +143,12 @@ def parse(msg):
         answers.append(record)
         answer_count -= 1
     # Authority
-    ns_count = header['ns_count']
+    authority_count = header['authority_count']
     authorities = []
-    while ns_count > 0:
+    while authority_count > 0:
         msg, record = parse_resource_record(msg)
         authorities.append(record)
-        ns_count -= 1
+        authority_count -= 1
     # Additional
     additional_count = header['additional_count']
     additionals = []
