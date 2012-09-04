@@ -76,7 +76,13 @@ def get_header(msg):
         'rcode':               (p[1]     )  % 16,
     }
 
-def get_part(msg):
+def _get_part(msg):
+    r"""
+    >>> _get_part('\x07example')
+    (8, 'example')
+    >>> _get_part('\x00')
+    (1, None)
+    """
     # Read a byte, which indicates length
     # if length is 0, it is the end
     # otherwise read the part, report the part and length used
@@ -91,9 +97,15 @@ def get_part(msg):
     return (length + 1, part)
 
 def get_name(msg):
+    r"""
+    >>> get_name('\x07example\x03com\x00')
+    ('', 'example.com')
+    >>> get_name('\x07example\x03com\x00stuffattheend')
+    ('stuffattheend', 'example.com')
+    """
     parts = []
     while True:
-        offset, part = get_part(msg)
+        offset, part = _get_part(msg)
         if part is None:
             msg = msg[1:]
             break
@@ -126,6 +138,17 @@ def parse_resource_record(msg):
     })
 
 def parse(msg):
+    r"""
+    >>> x = parse('\xf7\x91\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01')
+    >>> x['header']['question_count']
+    1
+    >>> x['questions'][0]['name']
+    'example.com'
+    >>> x['questions'][0]['qtype']
+    1
+    >>> x['questions'][0]['qclass']
+    1
+    """
     header = get_header(msg)
     msg = msg[12:]
     # Question
