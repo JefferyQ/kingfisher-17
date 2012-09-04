@@ -55,8 +55,19 @@ class UdpThread(threading.Thread):
                 data, addr = recv_sock.recvfrom(512)
                 logging.debug('Connection from %r', addr)
                 logging.debug('Message length %d', len(data))
-                x = dns.parse(data)
-                logging.debug('Message = %r', x)
-                recv_sock.sendto(data, addr)
+                request = dns.parse(data)
+                logging.debug('Message = %r', request)
+                response = dns.construct_response(request, {
+                    'opcode': 0, 'is_authorative': 0, 'is_truncated': 0,
+                    'recursion_available': 0, 'rcode': 0,
+                }, answers=[{
+                        'name': 'example.com',
+                        'type': 1,
+                        'class': 1,
+                        'ttl': 300,
+                        'rdata': ''.join([chr(int(x)) for x in '1.2.3.4'.split('.')]),
+                    }]
+                )
+                recv_sock.sendto(response, addr)
             except Exception as e:
                 logging.error('Got exception: %r', e)

@@ -1,4 +1,5 @@
 """
+RFC1035
 4.1.1. Header section format
 
 The header contains the following fields:
@@ -125,14 +126,14 @@ def get_header(msg):
         'answer_count': p[3],
         'ns_count': p[4],
         'additional_count': p[5],
-        'is_response': p[1] % 2,
-        'opcode': (p[1] >> 1) % 16,
-        'is_authorative': (p[1] >> 5) % 2,
-        'is_truncated': (p[1] >> 6) % 2,
-        'recursion_desired': (p[1] >> 7) % 2,
-        'recursion_available': (p[1] >> 8) % 2,
-        'z': (p[1] >> 9) % 8,
-        'rcode': (p[1] >> 12) % 16,
+        'is_response':         (p[1] >> 15) % 2,
+        'opcode':              (p[1] >> 11) % 16,
+        'is_authorative':      (p[1] >> 10) % 2,
+        'is_truncated':        (p[1] >> 9)  % 2,
+        'recursion_desired':   (p[1] >> 8)  % 2,
+        'recursion_available': (p[1] >> 7)  % 2,
+        'z':                   (p[1] >> 4)  % 8,
+        'rcode':               (p[1]     )  % 16,
     }
 
 def get_part(msg):
@@ -224,3 +225,71 @@ def parse(msg):
         'authorities': authorities,
         'additionals': additionals
     }
+
+# Construction
+
+def construct_part(part):
+    return struct.pack('>B', len(part)) + part
+
+def construct_name(name):
+    result = ''
+    for part in name.split('.'):
+        result += construct_part(part)
+    result += construct_part('')
+    return result
+
+def construct_record(record):
+    # record is:
+    #   name
+    #   type
+    #   class
+    #   ttl
+    #   rdlength
+    #   rdata
+    name = construct_name(record['name'])
+    middle = struct.pack('>HHIH', record['type'], record['class'],
+        record['ttl'], len(record['rdata']))
+    return name + middle + record['rdata']
+
+def construct_question(question):
+    name = construct_name(question['name'])
+    return name + struct.pack('>HH', question['qtype'], question['qclass'])
+
+def construct_response(request, result, questions=(), answers=(),
+        authorities=(), additionals=()):
+    # result is:
+    #   opcode
+    #   is_authorative
+    #   is_truncated
+    #   recursion_available
+    #   rcode
+    original_header = request['header']
+    question_count = len(request['questions'])
+    answers_count = len(answers)
+    authorities_count = len(authorities)
+    additionals_count = len(additionals)
+    msg_id = original_header['msg_id']
+    # This is a response
+    codes = 1 << 15
+    codes += result['opcode'] << 11
+    codes += result['is_authorative'] << 10
+    codes += result['is_truncated'] << 9
+    codes += original_header['recursion_desired'] << 8
+    codes += result['recursion_available'] << 7
+    # Skip Z
+    codes += result['rcode']
+    response = struct.pack('>HHHHHH', msg_id, codes, question_count,
+        answers_count, authorities_count, additionals_count)
+    # Question
+    for question in request['questions']:
+        response += construct_question(question)
+    # Answer
+    for record in answers:
+        response += construct_record(record)
+    # Authority
+    for record in authorities:
+        response += construct_record(record)
+    # Additional
+    for record in additionals:
+        response += construct_record(record)
+    return response
