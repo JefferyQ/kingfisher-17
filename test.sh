@@ -1,10 +1,9 @@
 #!/bin/sh
 
-env/bin/activate
+. env/bin/activate
 mkdir -p env/tmp
-nosetests \
+exec nosetests \
     --with-doctest \
     --with-coverage --cover-html --cover-html-dir=env/tmp \
     --cover-package=kingfisher \
     -m '/^kingfisher/'
-
