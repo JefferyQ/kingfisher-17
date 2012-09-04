@@ -14,5 +14,6 @@ def main(argv):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    FORMAT = '%(asctime)s %(levelname)s %(module)s:%(lineno)d %(message)s'
+    logging.basicConfig(level=logging.DEBUG, format=FORMAT)
     sys.exit(main(sys.argv))

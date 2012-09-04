@@ -150,25 +150,7 @@ def get_part(msg):
     # 1 byte used for the length
     return (length + 1, part)
 
-
-def parse_question(msg):
-    parts = []
-    while True:
-        offset, part = get_part(msg)
-        if part is None:
-            msg = msg[1:]
-            break
-        parts.append(part)
-        msg = msg[offset:]
-    qtype, qclass = struct.unpack('>HH', msg[:4])
-    logging.debug('qtype = %d, qclass = %d', qtype, qclass)
-    return (msg[4:], {
-        'name': '.'.join(parts),
-        'qtype': qtype,
-        'qclass': qclass,
-    })
-
-def parse_resource_record(msg):
+def get_name(msg):
     parts = []
     while True:
         offset, part = get_part(msg)
@@ -178,9 +160,25 @@ def parse_resource_record(msg):
         parts.append(part)
         msg = msg[offset:]
     name = '.'.join(parts)
-    type, klass, ttl, rd_length = struct.unpack('>HHIH')
+    return msg, name
+
+def parse_question(msg):
+    msg, name = get_name(msg)
+    qtype, qclass = struct.unpack('>HH', msg[:4])
+    logging.debug('qtype = %d, qclass = %d', qtype, qclass)
+    return (msg[4:], {
+        'name': name,
+        'qtype': qtype,
+        'qclass': qclass,
+    })
+
+def parse_resource_record(msg):
+    msg, name = get_name(msg)
+    type, klass, ttl, rd_length = struct.unpack('>HHIH', msg[:10])
+    msg = msg[10:]
     record_data = msg[:rd_length]
     return (msg[rd_length:], {
+        'name': name,
         'type': type,
         'class': klass,
         'ttl': ttl,
@@ -255,41 +253,44 @@ def construct_question(question):
     name = construct_name(question['name'])
     return name + struct.pack('>HH', question['qtype'], question['qclass'])
 
-def construct_response(request, result, questions=(), answers=(),
-        authorities=(), additionals=()):
-    # result is:
+def construct_response(request, response):
+    # response is:
     #   opcode
     #   is_authorative
     #   is_truncated
     #   recursion_available
     #   rcode
+    #   questions
+    #   answers
+    #   authorities
+    #   additionals
     original_header = request['header']
-    question_count = len(request['questions'])
-    answers_count = len(answers)
-    authorities_count = len(authorities)
-    additionals_count = len(additionals)
+    question_count    = len(response['questions'])
+    answers_count     = len(response['answers'])
+    authorities_count = len(response['authorities'])
+    additionals_count = len(response['additionals'])
     msg_id = original_header['msg_id']
     # This is a response
     codes = 1 << 15
-    codes += result['opcode'] << 11
-    codes += result['is_authorative'] << 10
-    codes += result['is_truncated'] << 9
+    codes += response['opcode'] << 11
+    codes += response['is_authorative'] << 10
+    codes += response['is_truncated'] << 9
     codes += original_header['recursion_desired'] << 8
-    codes += result['recursion_available'] << 7
+    codes += response['recursion_available'] << 7
     # Skip Z
-    codes += result['rcode']
-    response = struct.pack('>HHHHHH', msg_id, codes, question_count,
+    codes += response['rcode']
+    result = struct.pack('>HHHHHH', msg_id, codes, question_count,
         answers_count, authorities_count, additionals_count)
     # Question
-    for question in request['questions']:
-        response += construct_question(question)
+    for question in response['questions']:
+        result += construct_question(question)
     # Answer
-    for record in answers:
-        response += construct_record(record)
+    for record in response['answers']:
+        result += construct_record(record)
     # Authority
-    for record in authorities:
-        response += construct_record(record)
+    for record in response['authorities']:
+        result += construct_record(record)
     # Additional
-    for record in additionals:
-        response += construct_record(record)
-    return response
+    for record in response['additionals']:
+        result += construct_record(record)
+    return result
