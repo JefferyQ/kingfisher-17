@@ -15,6 +15,7 @@ setup(
     url='http://kingfisher.thirdbeat.com',
     classifiers=[
     ],
+    scripts=['scripts/kingfisher'],
     packages=['kingfisher'],
 )
 

@@ -1,0 +1,4 @@
+#!python
+import sys
+from kingfisher.main import main
+sys.exit(main(sys.argv))

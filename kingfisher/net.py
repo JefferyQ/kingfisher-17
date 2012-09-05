@@ -54,30 +54,31 @@ class UdpThread(threading.Thread):
             try:
                 data, addr = recv_sock.recvfrom(512)
                 logging.debug('Connection from %r', addr)
-                logging.debug('Message length %d', len(data))
-                request = dns.parse(data)
-                logging.debug('Raw = %r', data)
-                logging.debug('Message = %r', request)
-                response = {
-                    'questions': [],
-                    'answers': [
-                        {
-                        'name': 'example.com',
-                        'type': 1,
-                        'class': 1,
-                        'ttl': 300,
-                        'rdata': ''.join([chr(int(x)) for x in '1.2.3.4'.split('.')]),
-                        }
-                    ],
-                    'authorities': [],
-                    'additionals': [],
-                    'opcode': 0,
-                    'is_authorative': 0,
-                    'is_truncated': 0,
-                    'recursion_available': 0,
-                    'rcode': 0,
-                }
-                output = dns.construct_response(request, response)
-                recv_sock.sendto(output, addr)
+                logging.debug('Message length %d raw = %r', len(data), data)
+                def thunk():
+                    request = dns.parse(data)
+                    logging.debug('Message = %r', request)
+                    response = {
+                        'questions': request['questions'],
+                        'answers': [
+                            {
+                            'name': 'example.com',
+                            'type': 1,
+                            'class': 1,
+                            'ttl': 300,
+                            'rdata': ''.join([chr(int(x)) for x in '1.2.3.4'.split('.')]),
+                            }
+                        ],
+                        'authorities': [],
+                        'additionals': [],
+                        'opcode': 0,
+                        'is_authorative': 0,
+                        'is_truncated': 0,
+                        'recursion_available': 0,
+                        'rcode': 0,
+                    }
+                    output = dns.construct_response(request, response)
+                    recv_sock.sendto(output, addr)
+                thunk()
             except Exception as e:
                 logging.error('Got exception: %r', e, exc_info=True)
