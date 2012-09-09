@@ -8,11 +8,15 @@ import logging
 def main(argv):
     FORMAT = '%(asctime)s %(levelname)s %(module)s:%(lineno)d %(message)s'
     logging.basicConfig(level=logging.DEBUG, format=FORMAT)
-    sys.stdout.write(str(argv) + '\n')
+    logging.debug('%r', argv)
     u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     u.bind(('127.0.0.1', 1053))
     x = net.UdpThread(u)
     x.start()
+    try:
+        x.join()
+    except KeyboardInterrupt:
+        sys.exit(1)
     return 0
 
 
