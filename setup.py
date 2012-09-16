@@ -17,5 +17,7 @@ setup(
     ],
     scripts=['scripts/kingfisher'],
     packages=['kingfisher'],
+    requires=[
+        'docopt (>= 0.50)',
+    ],
 )
-
