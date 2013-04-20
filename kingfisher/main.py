@@ -19,6 +19,7 @@ import socket
 import net
 import threading
 import logging
+import worker
 
 def parse_loglevel(raw_loglevel):
     return {
@@ -72,25 +73,29 @@ def to_daemon(func):
 def main(argv):
     arguments = docopt(__doc__, version='Kingfisher 0.1')
     logging.basicConfig(level=parse_loglevel(arguments['--log-level']),
-        format='%(asctime)s %(levelname)s %(module)s:%(lineno)d %(message)s')
+        format=('%(asctime)s %(process)d %(threadName)s '
+            '%(levelname)s %(module)s:%(lineno)d '
+            '%(message)s'),
+        filename='kingfisher.log')
     logging.info('arguments = %r', arguments)
     address = parse_address(arguments['--address'])
+    logging.info('address = %r', address)
     desired_uid = parse_user(arguments['--run-as'])
-    logging.info('Desired uid=%d', desired_uid)
+    logging.info('Desired uid = %d', desired_uid)
+    handler = worker.Handler()
     # Acquire sockets.
     u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     u.bind(address)
-    t = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    t.bind(address)
-    t.listen(15)
+    tcp_thread = net.TcpThread(address, handler)
     # Drop privileges
     drop_root(desired_uid)
     def func():
         # Start the program
-        x = net.UdpThread(u)
-        x.start()
+        udp_thread = net.UdpThread(u, handler)
+        udp_thread.start()
+        tcp_thread.start()
         try:
-            x.join()
+            udp_thread.join()
         except KeyboardInterrupt:
             sys.exit(1)
         return 0
