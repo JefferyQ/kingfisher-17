@@ -1,8 +1,8 @@
 """\
 Usage:
-    kingfisher [options]
     kingfisher -h | --help
     kingfisher --version
+    kingfisher [options] --file=FILE
 
 Options:
     -h --help          Show help.
@@ -10,6 +10,7 @@ Options:
     --address=ADDRESS  The address to bind to [default: 127.0.0.1:53]
     --run-as=USER      The user to run as.
     --log-level=LEVEL  The log level [INFO/DEBUG]. [default: INFO]
+    --file=FILE        The sqlite3 db file.
 
 """
 from docopt import docopt
@@ -20,6 +21,7 @@ import net
 import threading
 import logging
 import worker
+from .data import Connection
 
 def parse_loglevel(raw_loglevel):
     return {
@@ -82,7 +84,10 @@ def main(argv):
     logging.info('address = %r', address)
     desired_uid = parse_user(arguments['--run-as'])
     logging.info('Desired uid = %d', desired_uid)
-    handler = worker.Handler()
+    db_file = arguments['--file']
+    logging.info('DB File = %s', db_file)
+    conn = Connection(db_file)
+    handler = worker.Handler(conn)
     # Acquire sockets.
     u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     u.bind(address)

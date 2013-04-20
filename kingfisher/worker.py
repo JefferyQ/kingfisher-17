@@ -1,10 +1,20 @@
 import logging
 import dns
+from data import ObjectNotFoundException
 
 class Handler(object):
 
+    def __init__(self, connection):
+        self.conn = connection
+
     def handle(self, request):
         logging.info('Request = %r', request)
+        try:
+            result = self.conn.get()
+        except ObjectNotFoundException:
+            log.error('error')
+            raise
+        # ''.join([chr(int(x)) for x in '1.2.3.4'.split('.')])
         response = {
             'questions': request['questions'],
             'answers': [
@@ -12,8 +22,8 @@ class Handler(object):
                 'name': 'example.com',
                 'type': 1,
                 'class': 1,
-                'ttl': 300,
-                'rdata': ''.join([chr(int(x)) for x in '1.2.3.4'.split('.')]),
+                'ttl': result['ttl'],
+                'rdata': ''.join([chr(int(x)) for x in result['answer'].split('.'))
                 }
             ],
             'authorities': [],
