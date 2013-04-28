@@ -7,6 +7,12 @@ class Handler(object):
     def __init__(self, connection):
         self.conn = connection
 
+    def handle_question(self, question):
+        try:
+            result = self.conn.get(question)
+        except ObjectNotFoundException:
+            pass
+
     def handle(self, request):
         logging.info('Request = %r', request)
         try:
