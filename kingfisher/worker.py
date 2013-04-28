@@ -1,6 +1,6 @@
 import logging
 import dns
-from data import ObjectNotFoundException
+from .constants import TYPES, QTYPES, CLASSES, QCLASSES
 
 class Handler(object):
 
@@ -8,37 +8,35 @@ class Handler(object):
         self.conn = connection
 
     def handle_question(self, question):
-        try:
-            result = self.conn.get(question)
-        except ObjectNotFoundException:
-            pass
+        return list(self.conn.get(question))
 
     def handle(self, request):
         logging.info('Request = %r', request)
-        try:
-            result = self.conn.get()
-        except ObjectNotFoundException:
-            log.error('error')
-            raise
+        answers = []
+        rcode = 0
+        for question in request['questions']:
+            qtype = question['qtype']
+            if qtype == QTYPES['*']:
+                types = TYPES.values()
+            else:
+                types = [qtype]
+            qclass = question['qclass']
+            if qclass == QCLASSES['*']:
+                classes = CLASSES.values()
+            else:
+                classes = [qclass]
+            answers += list(self.conn.get(question['name'], types, classes))
         # ''.join([chr(int(x)) for x in '1.2.3.4'.split('.')])
         response = {
             'questions': request['questions'],
-            'answers': [
-                {
-                'name': 'example.com',
-                'type': 1,
-                'class': 1,
-                'ttl': result['ttl'],
-                'rdata': ''.join([chr(int(x)) for x in result['answer'].split('.'))
-                }
-            ],
+            'answers': answers,
             'authorities': [],
             'additionals': [],
             'opcode': 0,
             'is_authorative': 0,
             'is_truncated': 0,
             'recursion_available': 0,
-            'rcode': 0,
+            'rcode': rcode,
         }
         logging.info('Response = %r', response)
         return response

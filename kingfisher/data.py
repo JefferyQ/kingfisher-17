@@ -1,19 +1,19 @@
 import sqlite3
+import dns
 
 class Connection(object):
     """
     >>> c = Connection(':memory:')
     >>> c.insert({'type': 1, 'class': 1, 'name': 'EXAMPLE.com', 'answer': 'blah', 'ttl': 300, 'priority': 0})
-    >>> foo = c.get('example.com', 1, 1)
-    >>> foo is not None
+    >>> foo = c.get('example.com', [1], [1])
+    >>> list(foo) is not None
     True
-    >>> foo = c.get('EXAMPLE.COM', 1, 1)
-    >>> foo is not None
+    >>> foo = c.get('EXAMPLE.COM', [1], [1])
+    >>> list(foo) is not None
     True
-    >>> foo = c.get('NONEXISTENT', 1, 1)
-    Traceback (most recent call last):
-        ...
-    ObjectNotFoundException
+    >>> foo = c.get('NONEXISTENT', [1], [1])
+    >>> list(foo)
+    []
     """
     DOMAIN_NAMES = """
     CREATE TABLE IF NOT EXISTS domain_names (
@@ -42,15 +42,24 @@ class Connection(object):
             row['priority']])
         self.conn.commit()
 
-    def get(self, name, type, ns_class):
+    def get(self, name, types, classes):
+        if not types:
+            return
+        if not classes:
+            return
         c = self.conn.cursor()
-        c.execute('''SELECT answer, ttl, priority FROM domain_names
-            WHERE name = ? AND type = ? AND class = ?''', [name, type, ns_class])
-        result = c.fetchone()
-        if result is None:
-            raise ObjectNotFoundException()
-        return {'answer': result[0], 'ttl': result[1], 'priority': result[2]}
-
-
-class ObjectNotFoundException(Exception):
-    pass
+        c.execute('''SELECT name, type, class, answer, ttl, priority
+            FROM domain_names
+            WHERE name = ? AND type in (%s) AND class in (%s)''' % (
+                ','.join('?' * len(types)),
+                ','.join('?' * len(classes)),
+            ), [name] + types + classes)
+        for result in c.fetchall():
+            yield {
+                'name': result[0],
+                'type': result[1],
+                'class': result[2],
+                'answer': result[3],
+                'ttl': result[4],
+                'priority': result[5],
+            }
