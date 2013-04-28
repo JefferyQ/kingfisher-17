@@ -25,7 +25,11 @@ class Handler(object):
                 classes = CLASSES.values()
             else:
                 classes = [qclass]
-            answers += list(self.conn.get(question['name'], types, classes))
+            for a in self.conn.get(question['name'], types, classes):
+                logging.info('Answer = %r', a)
+                a['rdata'] = ''.join([chr(int(x)) for x in a['answer'].split('.')])
+                a['name'] = a['name'].encode('ascii')
+                answers.append(a)
         # ''.join([chr(int(x)) for x in '1.2.3.4'.split('.')])
         response = {
             'questions': request['questions'],
