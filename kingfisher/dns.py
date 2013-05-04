@@ -115,6 +115,10 @@ def get_name(msg):
     return msg, name
 
 def parse_question(msg):
+    r"""
+    >>> parse_question('\x07example\x03com\x00\x00\xff\x00\xff')
+    ('', {'qclass': 255, 'qtype': 255, 'name': 'example.com'})
+    """
     msg, name = get_name(msg)
     qtype, qclass = struct.unpack('>HH', msg[:4])
     logging.debug('qtype = %d, qclass = %d', qtype, qclass)
@@ -125,6 +129,10 @@ def parse_question(msg):
     })
 
 def parse_resource_record(msg):
+    r"""
+    >>> parse_resource_record('\x07example\x03com\x00\x00\xff\x00\x01\x00\x00\xf0\x00\xff\x00')
+    ('', {'record': '', 'ttl': 61440, 'type': 255, 'name': 'example.com', 'class': 1})
+    """
     msg, name = get_name(msg)
     type, klass, ttl, rd_length = struct.unpack('>HHIH', msg[:10])
     msg = msg[10:]
@@ -190,9 +198,17 @@ def parse(msg):
 # Construction
 
 def construct_part(part):
+    r"""
+    >>> construct_part('name')
+    '\x04name'
+    """
     return struct.pack('>B', len(part)) + part
 
 def construct_name(name):
+    r"""
+    >>> construct_name('example.com')
+    '\x07example\x03com\x00'
+    """
     result = ''
     for part in name.split('.'):
         result += construct_part(part)
@@ -200,6 +216,16 @@ def construct_name(name):
     return result
 
 def construct_record(record):
+    r"""
+    >>> construct_record({
+    ...     'name': 'example.com',
+    ...     'type': 1,
+    ...     'class': 1,
+    ...     'ttl': 300,
+    ...     'rdata': '\x01\x02\x03\x04'
+    ... })
+    '\x07example\x03com\x00\x00\x01\x00\x01\x00\x00\x01,\x00\x04\x01\x02\x03\x04'
+    """
     # record is:
     #   name
     #   type
@@ -213,10 +239,87 @@ def construct_record(record):
     return name + middle + record['rdata']
 
 def construct_question(question):
+    r"""
+    >>> x = {
+    ...     'name': 'example.com',
+    ...     'qtype': 255,
+    ...     'qclass': 255
+    ... }
+    >>> construct_question(x)
+    '\x07example\x03com\x00\x00\xff\x00\xff'
+    >>> x == parse_question(construct_question(x))[1]
+    True
+    """
     name = construct_name(question['name'])
     return name + struct.pack('>HH', question['qtype'], question['qclass'])
 
 def construct_response(request, response):
+    r"""
+    >>> request = {
+    ...     'header': {
+    ...         'msg_id': 123,
+    ...         'question_count': 0,
+    ...         'answer_count': 0,
+    ...         'authority_count': 0,
+    ...         'additional_count': 0,
+    ...         'is_response':         0,
+    ...         'opcode':              0,
+    ...         'is_authorative':      0,
+    ...         'is_truncated':        0,
+    ...         'recursion_desired':   0,
+    ...         'recursion_available': 0,
+    ...         'z':                   0,
+    ...         'rcode':               0,
+    ...     },
+    ...     'questions': [
+    ...         {
+    ...             'name': 'example.com',
+    ...             'qtype': 255,
+    ...             'qclass': 255
+    ...         }
+    ...     ],
+    ...     'answers': [],
+    ...     'authorities': [],
+    ...     'additionals': [],
+    ... }
+    >>> response = {
+    ...     'questions': request['questions'],
+    ...     'answers': [
+    ...         {
+    ...             'name': 'example.com',
+    ...             'type': 1,
+    ...             'class': 1,
+    ...             'ttl': 300,
+    ...             'rdata': '\x01\x02\x03\x04'
+    ...         },
+    ...     ],
+    ...     'authorities': [
+    ...         {
+    ...             'name': 'ns1.example.com',
+    ...             'type': 2,
+    ...             'class': 1,
+    ...             'ttl': 300,
+    ...             'rdata': '\x01\x02\x03\x04'
+    ...         },
+    ...     ],
+    ...     'additionals': [
+    ...         {
+    ...             'name': 'ns2.example.com',
+    ...             'type': 2,
+    ...             'class': 1,
+    ...             'ttl': 300,
+    ...             'rdata': '\x01\x02\x03\x04'
+    ...         },
+    ...     ],
+    ...     'opcode': 0,
+    ...     'is_authorative': 0,
+    ...     'is_truncated': 0,
+    ...     'recursion_available': 0,
+    ...     'rcode': 0,
+    ... }
+    >>> construct_response(request, response)
+    '\x00{\x80\x00\x00\x01\x00\x01\x00\x01\x00\x01\x07example\x03com\x00\x00\xff\x00\xff\x07example\x03com\x00\x00\x01\x00\x01\x00\x00\x01,\x00\x04\x01\x02\x03\x04\x03ns1\x07example\x03com\x00\x00\x02\x00\x01\x00\x00\x01,\x00\x04\x01\x02\x03\x04\x03ns2\x07example\x03com\x00\x00\x02\x00\x01\x00\x00\x01,\x00\x04\x01\x02\x03\x04'
+    """
     # response is:
     #   opcode
     #   is_authorative
